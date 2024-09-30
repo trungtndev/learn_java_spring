@@ -12,7 +12,6 @@ import org.mapstruct.MappingTarget;
 public interface UserMapper {
     User toUser(UserCreationRequest request);
 
-    @Mapping(source = "firstName", target = "lastName")
     UserRespone toUserResponse(User user);
     void toUpdateUSer(@MappingTarget User user, UserUpdateRequest request);
 }

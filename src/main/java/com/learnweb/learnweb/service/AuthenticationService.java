@@ -5,6 +5,7 @@ import com.learnweb.learnweb.dto.request.AuthenticationRequest;
 import com.learnweb.learnweb.dto.request.IntrosoectRequest;
 import com.learnweb.learnweb.dto.response.AuthenticationResponse;
 import com.learnweb.learnweb.dto.response.IntrosoectRespone;
+import com.learnweb.learnweb.entity.User;
 import com.learnweb.learnweb.exceptoion.AppException;
 import com.learnweb.learnweb.exceptoion.ErrorCode;
 import com.learnweb.learnweb.repository.UserRepository;
@@ -22,11 +23,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import java.text.ParseException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.StringJoiner;
 
 @Slf4j
 @Service
@@ -45,7 +48,7 @@ public class AuthenticationService {
         JWSVerifier jwsVerifier = new MACVerifier(SIGNING_KEY.getBytes());
 
         SignedJWT signedJWT = SignedJWT.parse(token);
-        Date expiration = signedJWT.getJWTClaimsSet().getExpirationTime();
+            Date expiration = signedJWT.getJWTClaimsSet().getExpirationTime();
 
         var verified = signedJWT.verify(jwsVerifier);
         return IntrosoectRespone.builder()
@@ -66,23 +69,23 @@ public class AuthenticationService {
             throw new AppException(ErrorCode.UNTHENTICATED);
         }
 
-        var token = generateToken(request.getUsernname());
+        var token = generateToken(user);
         return AuthenticationResponse.builder()
                 .isAuthenticate(authenticated)
                 .token(token)
                 .build();
     }
 
-    private String generateToken(String username) throws JOSEException {
+    private String generateToken(User user) throws JOSEException {
         JWSHeader jwsHeader = new JWSHeader(JWSAlgorithm.HS512);
         JWTClaimsSet jwtClaimsSet = new JWTClaimsSet.Builder()
-                .subject(username)
+                .subject(user.getUsername())
                 .issuer("learnweb")
                 .issueTime(new Date())
                 .expirationTime(new Date(
                         Instant.now().plus(1, ChronoUnit.HOURS).toEpochMilli()
                 ))
-                .claim("role", "user")
+                .claim("scope", buildScope(user))
                 .build();
 
         Payload payload = new Payload(jwtClaimsSet.toJSONObject());
@@ -96,5 +99,15 @@ public class AuthenticationService {
             log.error("cannot create token " + e);
             throw new RuntimeException(e);
         }
+    }
+
+
+    public String buildScope(User user){
+        StringJoiner joiner = new StringJoiner(" ");
+
+        if (!CollectionUtils.isEmpty(user.getRoles())){
+            user.getRoles().forEach(joiner::add);
+        }
+        return joiner.toString();
     }
 }

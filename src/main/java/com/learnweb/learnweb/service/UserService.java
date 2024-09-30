@@ -13,6 +13,10 @@ import com.learnweb.learnweb.repository.UserRepository;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.prepost.PostAuthorize;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -23,6 +27,7 @@ import java.util.List;
 @Service
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 @RequiredArgsConstructor
+@Slf4j
 public class UserService {
     UserRepository userRepository;
     UserMapper userMapper;
@@ -45,13 +50,28 @@ public class UserService {
 
     }
 
-    public List<User> getUsers(){
-        return userRepository.findAll();
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<UserRespone> getUsers(){
+
+        log.info("Get all users");
+        return userRepository.findAll().stream()
+                .map(userMapper::toUserResponse).toList();
     }
 
+    @PostAuthorize("returnObject.username == authentication.name")
     public UserRespone getUser(String id){
+        log.info("Get user by id" + id);
         return userMapper.toUserResponse(userRepository.findById(id).
                 orElseThrow(() -> new RuntimeException("User not found")));
+    }
+
+    public UserRespone getMyInfo(){
+        var context = SecurityContextHolder.getContext();
+        String name = context.getAuthentication().getName();
+
+        User user = userRepository.findByUsername(name).orElseThrow(()
+                -> new AppException(ErrorCode.USERNAME_NOT_EXITED));
+        return userMapper.toUserResponse(user);
     }
 
     public UserRespone updateUser(String UserId, UserUpdateRequest request){
